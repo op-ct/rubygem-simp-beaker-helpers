@@ -1,7 +1,7 @@
 module Simp; end
 
 module Simp::BeakerHelpers
-  VERSION = '1.0.5'
+  VERSION = '1.0.6'
 
   # Locates .fixture.yml in or above this directory.
   def fixtures_yml_path
@@ -140,6 +140,7 @@ DEFAULT_KERNEL_TITLE=`/sbin/grubby --info=\\\${DEFAULT_KERNEL_INFO} | grep -m1 t
   end
 
 
+
   # Generate a fake openssl CA + certs for each host on a given SUT
   #
   # The directory structure is the same as what FakeCA drops into keydist/
@@ -147,25 +148,29 @@ DEFAULT_KERNEL_TITLE=`/sbin/grubby --info=\\\${DEFAULT_KERNEL_INFO} | grep -m1 t
   # NOTE: This generates everything within an SUT and copies it back out.
   #       This is because it is assumed the SUT will have the appropriate
   #       openssl in its environment, which may not be true of the host.
-  def run_fake_pki_ca_on( ca_sut = master, suts = hosts, local_dir = '' )
+  #
+  # FIXME: Unlike the real FakeCA, running this twice current regenerates the
+  #        CA certs due to the mindless nature of make.sh.
+  def run_fake_pki_ca_on( ca_sut = master, suts = hosts, local_pki_dir = '' )
     puts "== Fake PKI CA"
     pki_dir  = File.expand_path( "../../files/pki", File.dirname(__FILE__))
-    host_dir = '/root/pki'
+    host_pki_dir = '/root/pki'
     fqdns    = fact_on hosts, 'fqdn'
 
-    on ca_sut, %Q(mkdir -p "#{host_dir}")
-    Dir[ File.join(pki_dir, '*')].each {|f| scp_to( ca_sut, f, host_dir)}
+    on ca_sut, %Q(mkdir -p "#{host_pki_dir}")
+    Dir[ File.join(pki_dir, '*')].each {|f| scp_to( ca_sut, f, host_pki_dir)}
 
     # generate PKI certs for each SUT
     Dir.mktmpdir do |dir|
       pki_hosts_file = File.join(dir, 'pki.hosts')
       File.open(pki_hosts_file, 'w'){|fh| fqdns.each{|fqdn| fh.puts fqdn}}
-      scp_to(ca_sut, pki_hosts_file, host_dir)
+      scp_to(ca_sut, pki_hosts_file, host_pki_dir)
       # generate certs
-      on ca_sut, "cd #{host_dir}; cat #{host_dir}/pki.hosts | xargs bash make.sh"
+      on ca_sut, "cd '#{host_pki_dir}'; cat '#{host_pki_dir}/pki.hosts' | xargs bash make.sh"
     end
 
-    scp_from( ca_sut, host_dir, local_dir ) unless local_dir.empty?
+    # copy PKI dreectory back into local_pki_dir
+    scp_from( ca_sut, host_pki_dir, local_pki_dir ) unless local_pki_dir.empty?
   end
 
 
@@ -199,12 +204,15 @@ DEFAULT_KERNEL_TITLE=`/sbin/grubby --info=\\\${DEFAULT_KERNEL_INFO} | grep -m1 t
   #
   # This simulates the output of FakeCA's gencerts_nopass.sh to keydist/
   #
-  # FIXME: update keydist to use a more flexible path
-  def copy_keydist_to( ca_sut = master )
-    modulepath = on(ca_sut, 'puppet config print  modulepath --environment production' ).output.chomp.split(':')
-    on ca_sut, "rm -rf #{modulepath.first}/pki/files/keydist/*"
-    on ca_sut, "cp -a /root/pki/keydist/ #{modulepath.first}/pki/files/"
-    on ca_sut, "chgrp -R puppet #{modulepath.first}/pki/files/keydist"
+  def copy_keydist_to( ca_sut = master, host_keydist_dir = nil  )
+    if !host_keydist_dir
+      modulepath = on(ca_sut, 'puppet config print modulepath --environment production' ).output.chomp.split(':')
+      host_keydist_dir = "#{modulepath.first}/pki/files/keydist"
+    end
+    on ca_sut, "rm -rf #{host_keydist_dir}/*"
+    on ca_sut, "mkdir -p #{File.dirname(host_keydist_dir)}/"
+    on ca_sut, "cp -a /root/pki/keydist/ #{File.dirname(host_keydist_dir)}/"
+    on ca_sut, "chgrp -R puppet #{host_keydist_dir}"
   end
 
   ## Inline Hiera Helpers ##

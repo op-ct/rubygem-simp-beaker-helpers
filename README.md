@@ -90,12 +90,16 @@ The directory structure copied to the SUT is:
 
 #### `copy_keydist_to`
 
-Copy a CA keydist/ directory of CA+host certs into an SUT
+Copy a CA `keydist/` directory of CA+host certs into an SUT.
 
 This simulates the output of FakeCA's `gencerts_nopass.sh` into `keydist/` and is useful for constructing a Puppet master SUT that will distribute PKI keys via agent runs.
 
-`def copy_keydist_to( ca_sut = master )`
+**NOTE**: As a prerequisite, [`run_fake_pki_ca_on`](#run_fake_pki_ca_on) must have been run at least once on the `ca_sut`.
 
+`def copy_keydist_to( ca_sut = master, host_keydist_dir = nil )`
+
+ -  **ca_sut**           = _(String)_ The CA host to install `keydist/`
+ -  **host_keydist_dir** = _(Hash)_   _[Optional]_ The path on `ca_sut` that will serve as `keydist/`.  If this is left unset, an attempt will be made to find and use `#{modulepath}/pki/files/keydist`.
 
 #### `set_hieradata_on`
 
