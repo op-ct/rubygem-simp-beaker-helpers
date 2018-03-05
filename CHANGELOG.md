@@ -1,3 +1,7 @@
+### 1.10.2 / 2018-03-04
+* Improved `pluginsync_on` to completely mimic pluginsync
+  - now syncs other assets than facts (e.g., augeas lenses)
+
 ### 1.10.1 / 2018-02-13
 * Updated the Puppet version mapping list for Puppet 5
 * Fixed a bug in the way that the latest Puppet 5 version was being determined
